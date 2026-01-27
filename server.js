@@ -30,6 +30,17 @@ app.get('/', (req, res) => {
     });
 });
 
+// GET handler for webhook endpoint (for PSI Portal test connectivity)
+app.get('/webhook/support-requests', (req, res) => {
+    console.log(`[${new Date().toISOString()}] GET test request received`);
+    res.status(200).json({
+        status: 'SUCCESS',
+        message: 'Webhook endpoint is available',
+        method: 'GET',
+        ready: true
+    });
+});
+
 // Main webhook endpoint - receives Support Request data
 app.post('/webhook/support-requests', (req, res) => {
     try {
