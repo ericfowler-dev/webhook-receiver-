@@ -1,0 +1,27 @@
+# Render Blueprint — College Fit Dashboard (static site)
+#
+# This declares ONLY the static site. The existing webhook receiver
+# (server.js) is intentionally left out: it was created directly in the
+# Render dashboard, and declaring it here would create a second, duplicate
+# service rather than adopting the one already running.
+#
+# Deploy: Render Dashboard -> New -> Blueprint -> pick this repo.
+# Change `branch` below to whichever branch you want to serve from.
+
+services:
+  - type: web
+    name: college-fit-dashboard
+    runtime: static
+    branch: claude/college-fit-dashboard-mvp-hbcdql
+    staticPublishPath: ./college-fit-dashboard
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: SAMEORIGIN
+      - path: /*
+        name: Referrer-Policy
+        value: no-referrer

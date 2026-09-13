@@ -16,16 +16,40 @@ python3 -m http.server 8000 --directory college-fit-dashboard
 
 ## Deploying to Render (static site, free tier)
 
-This folder is the publish directory — Render serves it as-is.
+This folder is the publish directory — Render serves it as-is. No build step,
+so the free static-site tier costs $0.
 
-1. Render Dashboard → **New** → **Static Site**, pointed at this repository.
-2. **Build command:** leave empty.
-3. **Publish directory:** `college-fit-dashboard`
-4. Deploy. Cost is $0 on the free static-site tier.
+**The branch matters.** The dashboard currently lives on
+`claude/college-fit-dashboard-mvp-hbcdql`, not on `master`. Either point Render
+at that branch, or merge to `master` first and change the branch accordingly.
 
-The repository's existing `server.js` webhook receiver is a separate Web
-Service and is unaffected — a static site and a web service can run side by
-side from one repo.
+### Option A — Blueprint (uses `render.yaml` at the repo root)
+
+1. Render Dashboard → **New** → **Blueprint**
+2. Pick this repository. Render reads `render.yaml` and proposes the
+   `college-fit-dashboard` static site.
+3. **Apply**.
+
+Edit the `branch:` field in `render.yaml` to serve from a different branch.
+
+### Option B — Create the static site by hand
+
+1. Render Dashboard → **New** → **Static Site**, pointed at this repository
+2. **Branch:** `claude/college-fit-dashboard-mvp-hbcdql`
+3. **Build command:** leave empty
+4. **Publish directory:** `college-fit-dashboard`
+5. **Create Static Site**
+
+Option B ignores `render.yaml` entirely, which is the simpler mental model if
+you are not otherwise using blueprints.
+
+### About the existing webhook service
+
+The repository's `server.js` webhook receiver is a separate Web Service and is
+unaffected — a static site and a web service run side by side from one repo.
+`render.yaml` deliberately does **not** declare it: that service was created in
+the dashboard, and listing it in a blueprint would spin up a duplicate rather
+than adopt the running one.
 
 ## What it does
 
