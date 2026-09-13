@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>College Fit Dashboard</title>
+<meta name="description" content="Compare colleges on weighted priorities, four-year cash flow, and fit factors.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>🎓</text></svg>">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body data-palette="#2a78d6,#eb6834,#1baf7a,#4a3aa7">
+
+<header class="topbar">
+  <div class="topbar__title">
+    <span class="topbar__mark" aria-hidden="true">🎓</span>
+    <div>
+      <h1>College Fit Dashboard</h1>
+      <p class="topbar__sub">Weighted priorities &middot; four-year cash flow &middot; fit factors</p>
+    </div>
+  </div>
+  <div class="topbar__actions">
+    <button type="button" id="addCollege" class="btn btn--primary">+ Add college</button>
+    <button type="button" id="exportBtn" class="btn">Export</button>
+    <button type="button" id="importBtn" class="btn">Import</button>
+    <button type="button" id="printBtn" class="btn">Print</button>
+    <button type="button" id="resetBtn" class="btn btn--quiet">Reset</button>
+    <button type="button" id="themeBtn" class="btn btn--icon" aria-label="Switch color theme" title="Switch color theme">
+      <span id="themeGlyph" aria-hidden="true">◐</span>
+    </button>
+    <input type="file" id="importFile" accept="application/json,.json" hidden>
+  </div>
+</header>
+
+<main class="dash">
+
+  <!-- ============ RANKING ============ -->
+  <section class="panel panel--wide" id="panelRanking" aria-labelledby="h-ranking">
+    <div class="panel__head">
+      <div>
+        <h2 id="h-ranking">The ranking</h2>
+        <p class="panel__hint">Fit score = every priority weight &times; its score, rescaled to 100.</p>
+      </div>
+      <div class="seg" role="group" aria-label="Ranking view">
+        <button type="button" class="seg__btn is-active" data-view="chart" data-target="ranking">Chart</button>
+        <button type="button" class="seg__btn" data-view="table" data-target="ranking">Table</button>
+      </div>
+    </div>
+
+    <div id="verdict" class="verdict"></div>
+
+    <div class="view" data-view-for="ranking" data-view-kind="chart">
+      <figure class="figure">
+        <figcaption class="figure__cap">Fit score out of 100, split by what each priority contributes</figcaption>
+        <div id="rankChart" class="chart"></div>
+        <div id="rankLegend" class="legend"></div>
+      </figure>
+    </div>
+    <div class="view is-hidden" data-view-for="ranking" data-view-kind="table">
+      <div class="tablewrap"><table id="rankTable" class="data"></table></div>
+    </div>
+  </section>
+
+  <!-- ============ PRIORITIES ============ -->
+  <section class="panel panel--third" aria-labelledby="h-weights">
+    <div class="panel__head">
+      <div>
+        <h2 id="h-weights">Your priorities</h2>
+        <p class="panel__hint">Drag to say how much each one matters. 0 drops it out.</p>
+      </div>
+    </div>
+    <div id="weightList" class="weights"></div>
+    <div class="addrow">
+      <input type="text" id="newCriterion" class="input" placeholder="Add a priority (e.g. Study abroad)" maxlength="40">
+      <button type="button" id="addCriterion" class="btn">Add</button>
+    </div>
+  </section>
+
+  <!-- ============ FIT MATRIX ============ -->
+  <section class="panel panel--twothirds" aria-labelledby="h-scores">
+    <div class="panel__head">
+      <div>
+        <h2 id="h-scores">How each school scores</h2>
+        <p class="panel__hint">Gut-check each school 1&ndash;10 on every priority. Affordability is calculated for you.</p>
+      </div>
+    </div>
+    <div class="tablewrap"><table id="scoreMatrix" class="matrix"></table></div>
+  </section>
+
+  <!-- ============ MONEY INPUTS ============ -->
+  <section class="panel panel--wide" aria-labelledby="h-money">
+    <div class="panel__head">
+      <div>
+        <h2 id="h-money">The money</h2>
+        <p class="panel__hint">Numbers are placeholders &mdash; replace them with each school's actual award letter.</p>
+      </div>
+    </div>
+    <div id="moneyGrid" class="moneygrid"></div>
+  </section>
+
+  <!-- ============ CASH FLOW ============ -->
+  <section class="panel panel--wide" aria-labelledby="h-cash">
+    <div class="panel__head">
+      <div>
+        <h2 id="h-cash">Cash flow, year by year</h2>
+        <p class="panel__hint">What's still unpaid after aid, family cash, earnings and savings gets borrowed.</p>
+      </div>
+      <div class="seg" role="group" aria-label="Cash flow school">
+        <span class="seg__label">School</span>
+        <span id="cashTabs" class="seg__tabs"></span>
+      </div>
+    </div>
+    <div id="statTiles" class="tiles"></div>
+    <figure class="figure">
+      <figcaption class="figure__cap">Borrowed each year</figcaption>
+      <div id="borrowChart" class="chart"></div>
+      <div id="borrowLegend" class="legend"></div>
+    </figure>
+    <div class="tablewrap"><table id="cashTable" class="data"></table></div>
+  </section>
+
+  <!-- ============ WHO PAYS ============ -->
+  <section class="panel panel--wide" aria-labelledby="h-mix">
+    <div class="panel__head">
+      <div>
+        <h2 id="h-mix">Who pays the bill</h2>
+        <p class="panel__hint">The whole degree, split by source. Loans are shown at what they cost after interest.</p>
+      </div>
+      <div class="seg" role="group" aria-label="Payment mix view">
+        <button type="button" class="seg__btn is-active" data-view="chart" data-target="mix">Chart</button>
+        <button type="button" class="seg__btn" data-view="table" data-target="mix">Table</button>
+      </div>
+    </div>
+    <div class="view" data-view-for="mix" data-view-kind="chart">
+      <figure class="figure">
+        <div id="mixChart" class="chart"></div>
+        <div id="mixLegend" class="legend"></div>
+      </figure>
+    </div>
+    <div class="view is-hidden" data-view-for="mix" data-view-kind="table">
+      <div class="tablewrap"><table id="mixTable" class="data"></table></div>
+    </div>
+  </section>
+
+  <!-- ============ ASSUMPTIONS ============ -->
+  <section class="panel panel--wide panel--quiet" aria-labelledby="h-notes">
+    <h2 id="h-notes" class="h-small">How the math works</h2>
+    <ul class="notes">
+      <li><strong>Costs rise</strong> each year by the inflation rate you set, compounding from year&nbsp;1.</li>
+      <li><strong>Gift aid</strong> (grants and scholarships) is subtracted first. Untick "renews" for one-time awards.</li>
+      <li><strong>Order of payment:</strong> gift aid &rarr; family contribution + student earnings &rarr; savings/529 &rarr; loans cover the rest.</li>
+      <li><strong>In-school interest</strong> accrues on each year's borrowing from mid-year until graduation (unsubsidized-loan behavior).</li>
+      <li><strong>Monthly payment</strong> is a standard amortized payment over the repayment term you set.</li>
+      <li><strong>Salary strain</strong> is the monthly payment as a share of expected starting gross pay. Under 8% is comfortable, 8&ndash;12% is manageable, over 12% is tight.</li>
+      <li><strong>Affordability score</strong> compares total lifetime cost to family; the cheapest school scores 10 and the rest scale by ratio.</li>
+    </ul>
+    <p class="notes__foot">Everything you type is saved in this browser only. Nothing is uploaded. Estimates, not financial advice.</p>
+  </section>
+
+</main>
+
+<div id="tooltip" class="tip" role="status" aria-live="polite" hidden></div>
+<div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
