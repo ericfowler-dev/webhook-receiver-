@@ -47,6 +47,30 @@
   function seriesVar(i) { return 'var(--series-' + ((i % MAX_COLLEGES) + 1) + ')'; }
   function catVar(i) { return 'var(--cat-' + ((i % MAX_CRITERIA) + 1) + ')'; }
 
+  /* ---------- periods ----------
+     Money arrives on different clocks: tuition is billed by the year or the
+     semester, a part-time job pays monthly, savings is a single pot. Each
+     amount is stored exactly as the user typed it plus the period they chose;
+     the engine annualizes on read so the two never get mixed up. */
+
+  var PERIODS = {
+    year:     { label: 'per year',                     mult: 1,  suffix: '/yr' },
+    semester: { label: 'per semester (x2)',            mult: 2,  suffix: '/sem' },
+    month9:   { label: 'per month, school year (x9)',  mult: 9,  suffix: '/mo' },
+    month12:  { label: 'per month, all year (x12)',    mult: 12, suffix: '/mo' },
+    once:     { label: 'one-time total',               mult: 1,  suffix: 'total' }
+  };
+
+  function periodOf(fin, key) {
+    return PERIODS[fin[key + 'Period']] ? fin[key + 'Period'] : 'year';
+  }
+
+  /* every money read by the engine goes through here, so a monthly figure can
+     never be silently added to an annual one */
+  function annual(fin, key) {
+    return num(fin[key]) * PERIODS[periodOf(fin, key)].mult;
+  }
+
   /* ---------- defaults ---------- */
 
   function defaultCriteria() {
@@ -62,11 +86,17 @@
 
   function defaultFinance(over) {
     var base = {
-      tuition: 13000, housing: 12500, books: 2400, travel: 700,
+      tuition: 13000, tuitionPeriod: 'year',
+      housing: 12500, housingPeriod: 'year',
+      books: 2400, booksPeriod: 'year',
+      travel: 700, travelPeriod: 'year',
       inflation: 4,
-      grants: 8000, grantsRenewable: true,
-      family: 6000, earnings: 3500, savings: 20000,
-      years: 4, loanRate: 6.5, loanTerm: 10, salary: 62000
+      grants: 8000, grantsPeriod: 'year', grantsRenewable: true,
+      family: 500, familyPeriod: 'month12',
+      earnings: 400, earningsPeriod: 'month9',
+      savings: 20000, savingsPeriod: 'once',
+      years: 4, loanRate: 6.5, loanTerm: 10,
+      salary: 62000, salaryPeriod: 'year'
     };
     for (var k in (over || {})) base[k] = over[k];
     return base;
@@ -82,6 +112,7 @@
     return {
       version: SCHEMA_VERSION,
       theme: 'auto',
+      cashPeriod: 'year',
       activeCollege: null,
       criteria: crits,
       colleges: [
@@ -91,11 +122,13 @@
           fin: defaultFinance({})
         },
         {
-          id: uid('s'), name: 'Iowa State (ISU)',
-          scores: scores([9, 7, 8, 5]),
+          id: uid('s'), name: 'Illinois State (ISU)',
+          scores: scores([9, 7, 8, 6]),
           fin: defaultFinance({
-            tuition: 27000, housing: 10800, books: 2300, travel: 1400,
-            grants: 12000, salary: 66000
+            tuition: 12000, tuitionPeriod: 'semester',
+            housing: 1350, housingPeriod: 'month9',
+            books: 2300, travel: 1000,
+            grants: 12000, salary: 64000
           })
         }
       ]
@@ -154,6 +187,7 @@
       var src = (s && s.fin) || {};
       Object.keys(fin).forEach(function (k) {
         if (k === 'grantsRenewable') fin[k] = src[k] !== false;
+        else if (/Period$/.test(k)) { if (PERIODS[src[k]]) fin[k] = src[k]; }
         else if (src[k] !== undefined) fin[k] = clamp(num(src[k]), 0, 1e9);
       });
       fin.years = clamp(Math.round(fin.years), 1, 6);
@@ -170,6 +204,7 @@
     state = {
       version: SCHEMA_VERSION,
       theme: ['auto', 'light', 'dark'].indexOf(input.theme) > -1 ? input.theme : 'auto',
+      cashPeriod: input.cashPeriod === 'month' ? 'month' : 'year',
       activeCollege: null,
       criteria: crits,
       colleges: colleges
@@ -197,9 +232,9 @@
     var infl = num(fin.inflation) / 100;
     var rate = num(fin.loanRate) / 100;
     var term = clamp(Math.round(num(fin.loanTerm)), 1, 30);
-    var savingsLeft = Math.max(0, num(fin.savings));
-    var family = Math.max(0, num(fin.family));
-    var earnings = Math.max(0, num(fin.earnings));
+    var savingsLeft = Math.max(0, annual(fin, 'savings'));
+    var family = Math.max(0, annual(fin, 'family'));
+    var earnings = Math.max(0, annual(fin, 'earnings'));
     var yearCash = family + earnings;
 
     var rows = [];
@@ -208,8 +243,10 @@
 
     for (var y = 1; y <= years; y++) {
       var factor = Math.pow(1 + infl, y - 1);
-      var sticker = (num(fin.tuition) + num(fin.housing) + num(fin.books) + num(fin.travel)) * factor;
-      var offered = fin.grantsRenewable !== false ? num(fin.grants) : (y === 1 ? num(fin.grants) : 0);
+      var sticker = (annual(fin, 'tuition') + annual(fin, 'housing') +
+                     annual(fin, 'books') + annual(fin, 'travel')) * factor;
+      var grantsYear = annual(fin, 'grants');
+      var offered = fin.grantsRenewable !== false ? grantsYear : (y === 1 ? grantsYear : 0);
       var aid = Math.min(Math.max(0, offered), sticker);
       var net = sticker - aid;
       var cash = Math.min(net, yearCash);
@@ -243,11 +280,14 @@
     var totalInterest = Math.max(0, totalRepaid - tot.borrowed);
     var outOfPocket = tot.family + tot.earnings + tot.savings;
     var familyCost = outOfPocket + totalRepaid;
-    var salaryMonthly = num(fin.salary) / 12;
+    var salaryMonthly = annual(fin, 'salary') / 12;
     var strain = salaryMonthly > 0 ? (monthly / salaryMonthly) * 100 : 0;
 
     return {
       years: years, rows: rows, totals: tot,
+      monthsInSchool: years * 12,
+      salaryAnnual: annual(fin, 'salary'),
+      salaryMonthly: salaryMonthly,
       balanceAtGrad: balanceAtGrad,
       inSchoolInterest: inSchoolInterest,
       monthly: monthly,
@@ -367,29 +407,40 @@
   }
 
   var MONEY_FIELDS = [
-    { title: 'Cost of attendance — year 1', fields: [
-      { k: 'tuition', label: 'Tuition & fees', step: 100 },
-      { k: 'housing', label: 'Housing & meals', step: 100 },
-      { k: 'books', label: 'Books & personal', step: 50 },
-      { k: 'travel', label: 'Travel home', step: 50 },
-      { k: 'inflation', label: 'Annual increase (%)', step: 0.5, max: 20 }
+    { title: 'Cost of attendance', note: 'What the school bills before any aid', fields: [
+      { k: 'tuition', label: 'Tuition & fees', step: 100, periods: ['year', 'semester'] },
+      { k: 'housing', label: 'Housing & meals', step: 50, periods: ['year', 'semester', 'month9', 'month12'] },
+      { k: 'books', label: 'Books & personal', step: 25, periods: ['year', 'semester', 'month9'] },
+      { k: 'travel', label: 'Travel home', step: 25, periods: ['year', 'semester', 'month9'] },
+      { k: 'inflation', label: 'Annual increase', step: 0.5, max: 20, unit: '% per year, compounding' }
     ] },
-    { title: 'Gift aid (never repaid)', fields: [
-      { k: 'grants', label: 'Grants & scholarships', step: 250 },
+    { title: 'Gift aid', note: 'Grants and scholarships — never repaid', fields: [
+      { k: 'grants', label: 'Grants & scholarships', step: 250, periods: ['year', 'semester'] },
       { k: 'grantsRenewable', label: 'Renews every year', type: 'check' }
     ] },
     { title: 'How you pay the rest', fields: [
-      { k: 'family', label: 'Family cash / year', step: 250 },
-      { k: 'earnings', label: 'Student earnings / year', step: 250 },
-      { k: 'savings', label: 'Savings & 529 (total)', step: 500 }
+      { k: 'family', label: 'Family contribution', step: 25, periods: ['month12', 'month9', 'year', 'semester'] },
+      { k: 'earnings', label: 'Student job income', step: 25, periods: ['month9', 'month12', 'year', 'semester'] },
+      { k: 'savings', label: 'Savings & 529', step: 500, periods: ['once'] }
     ] },
     { title: 'Loans & what comes after', fields: [
-      { k: 'years', label: 'Years to degree', step: 1, max: 6, min: 1 },
-      { k: 'loanRate', label: 'Loan interest rate (%)', step: 0.25, max: 20 },
-      { k: 'loanTerm', label: 'Repayment years', step: 1, max: 30, min: 1 },
-      { k: 'salary', label: 'Expected starting salary', step: 1000 }
+      { k: 'years', label: 'Years to degree', step: 1, max: 6, min: 1, unit: 'years' },
+      { k: 'loanRate', label: 'Loan interest rate', step: 0.25, max: 20, unit: '% per year (APR)' },
+      { k: 'loanTerm', label: 'Repayment term', step: 1, max: 30, min: 1, unit: 'years after graduation' },
+      { k: 'salary', label: 'Expected starting salary', step: 1000, periods: ['year', 'month12'] }
     ] }
   ];
+
+  /* The line under each amount: states the period, and converts to the other
+     clock the user is likely thinking in (annual <-> monthly). */
+  function echoText(fin, f) {
+    if (!f.periods) return '';          /* unit is already shown beside it */
+    var pk = periodOf(fin, f.k);
+    if (pk === 'once') return '';
+    var yearly = num(fin[f.k]) * PERIODS[pk].mult;
+    if (PERIODS[pk].mult === 1) return '= ' + usd(yearly / 12) + ' / month';
+    return '= ' + usd(yearly) + ' / year';
+  }
 
   function renderMoney() {
     $('#moneyGrid').innerHTML = state.colleges.map(function (col, i) {
@@ -400,14 +451,37 @@
               '<input id="f-' + esc(col.id) + '-' + f.k + '" type="checkbox" data-action="fin" data-college="' + esc(col.id) + '"' +
               ' data-field="' + f.k + '"' + (col.fin[f.k] !== false ? ' checked' : '') + '></div>';
           }
-          return '<div class="frow"><label for="f-' + esc(col.id) + '-' + f.k + '">' + f.label + '</label>' +
+
+          /* period control: a picker when the cadence genuinely varies,
+             otherwise a plain statement of the unit */
+          var control;
+          if (f.periods && f.periods.length > 1) {
+            var current = periodOf(col.fin, f.k);
+            control = '<select class="frow__period" data-action="period" data-college="' + esc(col.id) + '"' +
+              ' data-field="' + f.k + '" aria-label="' + esc(f.label) + ' period">' +
+              f.periods.map(function (pk) {
+                return '<option value="' + pk + '"' + (pk === current ? ' selected' : '') + '>' +
+                  PERIODS[pk].label + '</option>';
+              }).join('') + '</select>';
+          } else {
+            control = '<span class="frow__unit">' +
+              (f.periods ? PERIODS[f.periods[0]].label : (f.unit || '')) + '</span>';
+          }
+
+          return '<div class="frow">' +
+            '<label for="f-' + esc(col.id) + '-' + f.k + '">' + f.label + '</label>' +
             '<input id="f-' + esc(col.id) + '-' + f.k + '" type="number" inputmode="decimal"' +
             ' min="' + (f.min !== undefined ? f.min : 0) + '"' +
             (f.max !== undefined ? ' max="' + f.max + '"' : '') +
             ' step="' + f.step + '" value="' + num(col.fin[f.k]) + '"' +
-            ' data-action="fin" data-college="' + esc(col.id) + '" data-field="' + f.k + '"></div>';
+            ' data-action="fin" data-college="' + esc(col.id) + '" data-field="' + f.k + '">' +
+            '<div class="frow__sub">' + control +
+              '<span class="frow__echo" id="echo-' + esc(col.id) + '-' + f.k + '"></span>' +
+            '</div>' +
+          '</div>';
         }).join('');
-        return '<div class="fgroup"><div class="fgroup__title">' + g.title + '</div>' + rows + '</div>';
+        return '<div class="fgroup"><div class="fgroup__title">' + g.title + '</div>' +
+          (g.note ? '<p class="fgroup__note">' + g.note + '</p>' : '') + rows + '</div>';
       }).join('');
 
       return '<div class="mcard" style="--mcard-accent:' + seriesVar(i) + '">' +
@@ -427,6 +501,12 @@
     $('#addCollege').title = state.colleges.length >= MAX_COLLEGES
       ? 'Comparing more than ' + MAX_COLLEGES + ' at once stops being readable'
       : 'Add another school to the comparison';
+  }
+
+  function renderCashPeriod() {
+    document.querySelectorAll('[data-action="cash-period"]').forEach(function (b) {
+      b.classList.toggle('is-active', b.getAttribute('data-period') === state.cashPeriod);
+    });
   }
 
   function renderCashTabs() {
@@ -545,24 +625,30 @@
     var f = active.fin;
     var st = strainStatus(f.strain, f.totals.borrowed);
     var accent = seriesVar(active.index);
+    var term = clamp(Math.round(num(active.college.fin.loanTerm)), 1, 30);
 
     var tiles = [
-      { label: 'Borrowed', value: usd(f.totals.borrowed),
-        sub: f.inSchoolInterest > 0 ? '+ ' + usd(f.inSchoolInterest) + ' interest before graduation' : 'no in-school interest' },
-      { label: 'Monthly payment', value: usd(f.monthly),
-        sub: 'for ' + clamp(Math.round(num(active.college.fin.loanTerm)), 1, 30) + ' years after graduation' },
-      { label: 'Paid back in total', value: usd(f.totalRepaid),
+      { label: 'Borrowed', value: usd(f.totals.borrowed), unit: 'total',
+        sub: 'across ' + f.years + ' years' +
+          (f.inSchoolInterest > 0 ? ' · + ' + usd(f.inSchoolInterest) + ' interest before graduation' : '') },
+      { label: 'Loan payment', value: usd(f.monthly), unit: 'per month',
+        sub: 'every month for ' + term + ' years after graduation' },
+      { label: 'Paid back in total', value: usd(f.totalRepaid), unit: 'total',
         sub: usd(f.totalInterest) + ' of that is interest' },
-      { label: 'Salary strain', value: pct1(f.strain) + '%',
-        sub: 'of starting gross pay · <span class="status status--' + st.key + '">' + st.icon + ' ' + st.label + '</span>' },
-      { label: 'Out of pocket', value: usd(f.outOfPocket), sub: 'family, earnings and savings' },
-      { label: 'True cost of the degree', value: usd(f.familyCost), sub: 'out of pocket plus every loan payment' }
+      { label: 'Salary strain', value: pct1(f.strain) + '%', unit: 'of monthly pay',
+        sub: 'of ' + usd(f.salaryMonthly) + ' gross per month · ' +
+          '<span class="status status--' + st.key + '">' + st.icon + ' ' + st.label + '</span>' },
+      { label: 'Out of pocket', value: usd(f.outOfPocket), unit: 'total',
+        sub: 'about ' + usd(f.outOfPocket / f.monthsInSchool) + ' per month while in school' },
+      { label: 'True cost of the degree', value: usd(f.familyCost), unit: 'total',
+        sub: 'out of pocket plus every loan payment' }
     ];
 
     $('#statTiles').innerHTML = tiles.map(function (t) {
       return '<div class="tile" style="--tile-accent:' + accent + '">' +
         '<div class="tile__label">' + t.label + '</div>' +
-        '<div class="tile__value">' + t.value + '</div>' +
+        '<div class="tile__value">' + t.value +
+          (t.unit ? ' <span class="tile__unit">' + t.unit + '</span>' : '') + '</div>' +
         '<div class="tile__sub">' + t.sub + '</div></div>';
     }).join('');
   }
@@ -611,21 +697,32 @@
   function renderCashTable(model) {
     var active = model.results.filter(function (r) { return r.college.id === state.activeCollege; })[0] || model.results[0];
     var f = active.fin;
+    var monthly = state.cashPeriod === 'month';
+    var div = monthly ? 12 : 1;
+    var v = function (n) { return usd(n / div); };
 
-    var head = '<thead><tr><th>' + esc(active.college.name) + '</th>' +
-      '<th>Cost</th><th>Gift aid</th><th>Net</th><th>Family</th><th>Earnings</th><th>Savings</th><th>Borrowed</th></tr></thead>';
+    $('#cashCaption').textContent = monthly
+      ? 'Each academic year\u2019s money spread across 12 months \u2014 the amount to budget per month.'
+      : 'Totals for each academic year.';
+
+    var head = '<thead><tr><th>' + esc(active.college.name) +
+      '<span class="matrix__weight">' + (monthly ? 'per month' : 'per year') + '</span></th>' +
+      '<th>Cost</th><th>Gift aid</th><th>Net</th><th>Family</th><th>Job income</th><th>Savings</th><th>Borrowed</th></tr></thead>';
 
     var body = '<tbody>' + f.rows.map(function (r) {
       return '<tr><td>Year ' + r.year + '</td>' +
-        '<td>' + usd(r.sticker) + '</td><td>−' + usd(r.aid) + '</td><td>' + usd(r.net) + '</td>' +
-        '<td>' + usd(r.family) + '</td><td>' + usd(r.earnings) + '</td><td>' + usd(r.savings) + '</td>' +
-        '<td>' + usd(r.borrow) + '</td></tr>';
+        '<td>' + v(r.sticker) + '</td><td>\u2212' + v(r.aid) + '</td><td>' + v(r.net) + '</td>' +
+        '<td>' + v(r.family) + '</td><td>' + v(r.earnings) + '</td><td>' + v(r.savings) + '</td>' +
+        '<td>' + v(r.borrow) + '</td></tr>';
     }).join('') + '</tbody>';
 
     var t = f.totals;
-    var foot = '<tfoot><tr><td>Total</td><td>' + usd(t.sticker) + '</td><td>−' + usd(t.aid) + '</td>' +
-      '<td>' + usd(t.net) + '</td><td>' + usd(t.family) + '</td><td>' + usd(t.earnings) + '</td>' +
-      '<td>' + usd(t.savings) + '</td><td>' + usd(t.borrowed) + '</td></tr></tfoot>';
+    var footLabel = monthly ? 'Average month' : 'Total';
+    var footDiv = monthly ? f.monthsInSchool : 1;
+    var fv = function (n) { return usd(n / footDiv); };
+    var foot = '<tfoot><tr><td>' + footLabel + '</td><td>' + fv(t.sticker) + '</td><td>\u2212' + fv(t.aid) + '</td>' +
+      '<td>' + fv(t.net) + '</td><td>' + fv(t.family) + '</td><td>' + fv(t.earnings) + '</td>' +
+      '<td>' + fv(t.savings) + '</td><td>' + fv(t.borrowed) + '</td></tr></tfoot>';
 
     $('#cashTable').innerHTML = head + body + foot;
   }
@@ -633,7 +730,7 @@
   var MIX_KEYS = [
     { key: 'aid', label: 'Gift aid', cat: 0 },
     { key: 'family', label: 'Family cash', cat: 1 },
-    { key: 'earnings', label: 'Student earnings', cat: 2 },
+    { key: 'earnings', label: 'Student job income', cat: 2 },
     { key: 'savings', label: 'Savings & 529', cat: 3 },
     { key: 'loans', label: 'Loan payments', cat: 4 }
   ];
@@ -716,12 +813,24 @@
       var autoEl = document.getElementById('auto-' + r.college.id);
       if (autoEl) autoEl.textContent = score1(r.afford) + ' / 10';
 
+      MONEY_FIELDS.forEach(function (g) {
+        g.fields.forEach(function (f) {
+          var el = document.getElementById('echo-' + r.college.id + '-' + f.k);
+          if (el) el.textContent = echoText(r.college.fin, f);
+        });
+      });
+
       var tot = document.getElementById('mtot-' + r.college.id);
       if (tot) {
         var y1 = r.fin.rows[0];
+        var net = y1 ? y1.net : 0;
         tot.innerHTML =
-          '<div><span>Year 1 cost after aid</span><b>' + usd(y1 ? y1.net : 0) + '</b></div>' +
-          '<div><span>Year 1 borrowing</span><b>' + usd(y1 ? y1.borrow : 0) + '</b></div>' +
+          '<div><span>Year 1 cost after aid</span>' +
+            '<b>' + usd(net) + ' <span class="mcard__per">/yr</span></b></div>' +
+          '<div><span>Same figure per month</span>' +
+            '<b>' + usd(net / 12) + ' <span class="mcard__per">/mo</span></b></div>' +
+          '<div><span>Year 1 borrowing</span>' +
+            '<b>' + usd(y1 ? y1.borrow : 0) + ' <span class="mcard__per">/yr</span></b></div>' +
           '<div><span>Affordability score</span><b>' + score1(r.afford) + ' / 10</b></div>';
       }
     });
@@ -747,6 +856,7 @@
     renderMatrix();
     renderMoney();
     renderCashTabs();
+    renderCashPeriod();
     recalc();
   }
 
@@ -849,6 +959,24 @@
       }
     });
 
+    /* switching a period converts the amount so the yearly total holds steady */
+    document.addEventListener('change', function (e) {
+      var el = e.target;
+      if (el.getAttribute && el.getAttribute('data-action') === 'period') {
+        var col = collegeById(el.getAttribute('data-college'));
+        if (!col) return;
+        var field = el.getAttribute('data-field');
+        var yearly = num(col.fin[field]) * PERIODS[periodOf(col.fin, field)].mult;
+        var newMult = PERIODS[el.value] ? PERIODS[el.value].mult : 1;
+        col.fin[field + 'Period'] = PERIODS[el.value] ? el.value : 'year';
+        var converted = Math.round((yearly / newMult) * 100) / 100;
+        col.fin[field] = converted;
+        var input = document.getElementById('f-' + col.id + '-' + field);
+        if (input) input.value = converted;
+        recalc();
+      }
+    });
+
     /* structural buttons */
     document.addEventListener('click', function (e) {
       var el = e.target.closest('[data-action], [data-view]');
@@ -881,6 +1009,13 @@
         state.colleges = state.colleges.filter(function (c) { return c.id !== id; });
         if (state.activeCollege === id) state.activeCollege = state.colleges[0].id;
         renderAll();
+
+      } else if (action === 'cash-period') {
+        state.cashPeriod = el.getAttribute('data-period') === 'month' ? 'month' : 'year';
+        document.querySelectorAll('[data-action="cash-period"]').forEach(function (b) {
+          b.classList.toggle('is-active', b === el);
+        });
+        recalc();
 
       } else if (action === 'cash-tab') {
         state.activeCollege = el.getAttribute('data-college');

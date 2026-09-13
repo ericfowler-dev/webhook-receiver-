@@ -218,7 +218,9 @@ button, input, select { font: inherit; color: inherit; }
 }
 
 /* segmented control */
-.seg { display: flex; align-items: center; gap: 4px; }
+.seg { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.seg__stack { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+@media (max-width: 700px) { .seg__stack { align-items: flex-start; } }
 .seg__label { font-size: 0.7rem; color: var(--text-muted); margin-right: 2px; }
 .seg__tabs { display: flex; gap: 4px; }
 .seg__btn {
@@ -411,6 +413,13 @@ button, input, select { font: inherit; color: inherit; }
   font-weight: 680;
   letter-spacing: -0.02em;
   margin-top: 2px;
+}
+.tile__unit {
+  font-size: 0.68rem;
+  font-weight: 550;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 .tile__sub { font-size: 0.7rem; color: var(--text-secondary); margin-top: 1px; }
 
@@ -610,11 +619,43 @@ table.data, table.matrix {
 .frow {
   display: grid;
   grid-template-columns: 1fr 96px;
-  gap: 6px;
+  gap: 2px 6px;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 .frow label { font-size: 0.75rem; color: var(--text-secondary); }
+
+/* second line: the period this amount is on, and the same amount on the other clock */
+.frow__sub {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.frow__period {
+  padding: 1px 3px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  max-width: 60%;
+  cursor: pointer;
+}
+.frow__period:hover { border-color: var(--border-strong); color: var(--text-primary); }
+.frow__unit { font-size: 0.68rem; color: var(--text-muted); }
+.frow__echo {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.fgroup__note {
+  margin: -2px 0 7px;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
 .frow input[type="number"] {
   width: 100%;
   padding: 4px 6px;
@@ -646,6 +687,7 @@ table.data, table.matrix {
   padding: 1px 0;
 }
 .mcard__total b { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.mcard__per { font-size: 0.66rem; font-weight: 500; color: var(--text-muted); }
 
 /* ---------------- notes ---------------- */
 

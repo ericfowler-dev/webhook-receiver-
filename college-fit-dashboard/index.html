@@ -104,9 +104,16 @@
         <h2 id="h-cash">Cash flow, year by year</h2>
         <p class="panel__hint">What's still unpaid after aid, family cash, earnings and savings gets borrowed.</p>
       </div>
-      <div class="seg" role="group" aria-label="Cash flow school">
-        <span class="seg__label">School</span>
-        <span id="cashTabs" class="seg__tabs"></span>
+      <div class="seg__stack">
+        <div class="seg" role="group" aria-label="Cash flow school">
+          <span class="seg__label">School</span>
+          <span id="cashTabs" class="seg__tabs"></span>
+        </div>
+        <div class="seg" role="group" aria-label="Cash flow period">
+          <span class="seg__label">Show</span>
+          <button type="button" class="seg__btn is-active" data-action="cash-period" data-period="year">Per year</button>
+          <button type="button" class="seg__btn" data-action="cash-period" data-period="month">Per month</button>
+        </div>
       </div>
     </div>
     <div id="statTiles" class="tiles"></div>
@@ -115,6 +122,7 @@
       <div id="borrowChart" class="chart"></div>
       <div id="borrowLegend" class="legend"></div>
     </figure>
+    <p class="figure__cap" id="cashCaption"></p>
     <div class="tablewrap"><table id="cashTable" class="data"></table></div>
   </section>
 
@@ -147,7 +155,8 @@
     <ul class="notes">
       <li><strong>Costs rise</strong> each year by the inflation rate you set, compounding from year&nbsp;1.</li>
       <li><strong>Gift aid</strong> (grants and scholarships) is subtracted first. Untick "renews" for one-time awards.</li>
-      <li><strong>Order of payment:</strong> gift aid &rarr; family contribution + student earnings &rarr; savings/529 &rarr; loans cover the rest.</li>
+      <li><strong>Order of payment:</strong> gift aid &rarr; family contribution + student job income &rarr; savings/529 &rarr; loans cover the rest.</li>
+      <li><strong>Every amount carries its own period.</strong> A monthly figure is converted to a year before anything is added to it, so a $500/month contribution and a $12,000/semester tuition bill never get mixed up.</li>
       <li><strong>In-school interest</strong> accrues on each year's borrowing from mid-year until graduation (unsubsidized-loan behavior).</li>
       <li><strong>Monthly payment</strong> is a standard amortized payment over the repayment term you set.</li>
       <li><strong>Salary strain</strong> is the monthly payment as a share of expected starting gross pay. Under 8% is comfortable, 8&ndash;12% is manageable, over 12% is tight.</li>

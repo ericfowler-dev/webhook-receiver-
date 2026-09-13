@@ -38,13 +38,38 @@ side from one repo.
 | **Cash flow, year by year** | What gets borrowed each year, the monthly payment after graduation, and the strain on a starting salary |
 | **Who pays the bill** | The whole degree split by source, with loans counted at their post-interest cost |
 
+## Periods: every amount says what clock it is on
+
+Money arrives on different schedules. Tuition is billed by the year or the
+semester; a part-time job pays monthly; a 529 is a single pot. Mixing those up
+silently is the easiest way to get a wrong answer, so each amount is stored
+exactly as you typed it **plus the period you picked**, and the engine converts
+to an annual figure on read. Nothing monthly is ever added to something annual.
+
+Each input shows a period selector and the same amount on the other clock:
+
+| Period | Multiplier | Typical use |
+|---|---|---|
+| per year | ×1 | published cost of attendance |
+| per semester | ×2 | tuition bills and award letters |
+| per month, school year | ×9 | dorm contracts, a term-time job |
+| per month, all year | ×12 | a family's monthly contribution |
+| one-time total | — | savings and 529 balances |
+
+Switching the period converts the amount so the yearly total holds steady —
+$6,000 per year becomes $500 per month, not $6,000 per month.
+
+Outputs state their period too: the loan payment is **per month**, totals are
+labeled **total**, and the cash-flow table has a **per year / per month** toggle
+(annual figures spread across 12 months) for budgeting against a paycheck.
+
 ## How the numbers work
 
 Per year, costs grow by the inflation rate you set. Money is applied in this
 order:
 
 ```
-gift aid → family cash + student earnings → savings/529 → loans cover the rest
+gift aid → family contribution + student job income → savings/529 → loans cover the rest
 ```
 
 - **In-school interest** accrues on each year's borrowing from mid-year to
@@ -66,8 +91,10 @@ breaking the page). **Reset** restores the starting example.
 
 ## Notes
 
-- The starting numbers are **placeholders**. Replace them with figures from each
-  school's actual cost of attendance and award letter.
+- The starting numbers are **placeholders** — plausible shapes, not real published
+  figures. Replace them with each school's actual cost of attendance and award
+  letter. (The example compares Mizzou against Illinois State, with ISU's tuition
+  entered per semester and its housing per month to show the period handling.)
 - Up to **4 schools** and **8 priorities**. Both caps exist because the chart
   color palette is validated for colorblind-safe separation at those sizes —
   raising them would mean re-validating the palette.
