@@ -19,9 +19,10 @@ python3 -m http.server 8000 --directory college-fit-dashboard
 This folder is the publish directory — Render serves it as-is. No build step,
 so the free static-site tier costs $0.
 
-**The branch matters.** The dashboard currently lives on
-`claude/college-fit-dashboard-mvp-hbcdql`, not on `master`. Either point Render
-at that branch, or merge to `master` first and change the branch accordingly.
+**The branch matters.** Render's Blueprint flow reads `render.yaml` from the
+repository's **default branch** (`master`) — a blueprint sitting only on a
+feature branch is reported as missing. Creating a Static Site by hand (Option B)
+has no such constraint: you pick the branch in the form.
 
 ### Option A — Blueprint (uses `render.yaml` at the repo root)
 
@@ -31,11 +32,12 @@ at that branch, or merge to `master` first and change the branch accordingly.
 3. **Apply**.
 
 Edit the `branch:` field in `render.yaml` to serve from a different branch.
+The file itself still has to be on `master` for Render to find it.
 
 ### Option B — Create the static site by hand
 
 1. Render Dashboard → **New** → **Static Site**, pointed at this repository
-2. **Branch:** `claude/college-fit-dashboard-mvp-hbcdql`
+2. **Branch:** `master`
 3. **Build command:** leave empty
 4. **Publish directory:** `college-fit-dashboard`
 5. **Create Static Site**

@@ -6,13 +6,16 @@
 # service rather than adopting the one already running.
 #
 # Deploy: Render Dashboard -> New -> Blueprint -> pick this repo.
-# Change `branch` below to whichever branch you want to serve from.
+#
+# Render's Blueprint flow reads this file from the repository's DEFAULT
+# branch (master). It must be present on master or Render reports it as
+# missing -- having it only on a feature branch is not enough.
 
 services:
   - type: web
     name: college-fit-dashboard
     runtime: static
-    branch: claude/college-fit-dashboard-mvp-hbcdql
+    branch: master
     staticPublishPath: ./college-fit-dashboard
     pullRequestPreviewsEnabled: false
     headers:
